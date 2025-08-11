@@ -1,10 +1,9 @@
 /**
  * MIT License
  *
- * @brief Main entry point for YouTube Power Wheels ESP32 application.
+ * @brief Main program for ESP32-based project. Sets up all hardware, RTOS tasks, queues, and system initialization.
  *
  * @file main.cpp
- * @brief Main program for ESP32-based project. Sets up all hardware, RTOS tasks, queues, and system initialization.
  * @author Little Man Builds
  * @date 2025-08-01
  * @copyright Copyright (c) 2025 Little Man Builds

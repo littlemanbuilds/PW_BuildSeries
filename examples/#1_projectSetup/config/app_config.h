@@ -4,9 +4,9 @@
  * @brief Configuration file for all ESP32 parameters.
  *
  * @file app_config.h
- * @author Darren Osborne
+ * @author Little Man Builds
  * @date 2025-08-01
- * @copyright Copyright (c) 2025 Darren Osborne
+ * @copyright Copyright (c) 2025 Little Man Builds
  */
 
 #pragma once
@@ -24,7 +24,7 @@
 #endif
 
 /**
- * @brief Application-wide settings
+ * @brief Application-wide settings.
  */
 namespace cfg
 {
