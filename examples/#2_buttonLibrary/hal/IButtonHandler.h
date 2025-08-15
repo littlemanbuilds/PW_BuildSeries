@@ -48,24 +48,24 @@ public:
     /**
      * @brief Virtual destructor for safe polymorphic deletion.
      */
-    virtual ~IButtonHandler() = default;
+    virtual ~IButtonHandler() noexcept = default;
 
     /**
      * @brief Scan and process button states (debounce and press timing).
      */
-    virtual void update() = 0;
+    virtual void update() noexcept = 0;
 
     /**
      * @brief Get debounced state of button.
      * @param buttonId Index of button.
      * @return True if button is pressed.
      */
-    virtual bool isPressed(uint8_t buttonId) = 0;
+    [[nodiscard]] virtual bool isPressed(uint8_t buttonId) const noexcept = 0;
 
     /**
      * @brief Get and consume press event for a button.
      * @param buttonId Index of button.
      * @return ButtonPressType Event type: Short, Long, or None.
      */
-    virtual ButtonPressType getPressType(uint8_t buttonId) = 0;
+    virtual ButtonPressType getPressType(uint8_t buttonId) noexcept = 0;
 };

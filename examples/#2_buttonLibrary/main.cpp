@@ -22,11 +22,11 @@ constexpr UBaseType_t PRI_LISTENER = 1; ///< Task Priority 1.
 constexpr UBaseType_t PRI_HANDLER = 2;  ///< Task Priority 2.
 
 /**
- * @brief Task Context Structs.
+ * @brief Task Context Structs (data passed to the RTOS tasks).
  */
 struct ListenerContext
 {
-  ButtonHandler<NUM_BUTTONS> *buttons;
+  IButtonHandler *buttons; ///< Pointer to button handler interface for scanning inputs.
 };
 
 /**
@@ -90,6 +90,7 @@ void loop()
 void listener(void *parameter)
 {
   auto *ctx = static_cast<ListenerContext *>(parameter);
+  auto *btnHandler = ctx->buttons;
   TickType_t lastWake = xTaskGetTickCount();
 
   for (;;)
@@ -97,7 +98,7 @@ void listener(void *parameter)
     ctx->buttons->update(); // Scan all button states.
 
     // Example 1: isPressed method.
-    /* if (ctx->buttons->isPressed(ButtonIndex::TestButton))
+    /* if (btnHndler->isPressed(ButtonIndex::TestButton))
     {
       debugln("ButtonTest is pressed!");
     }
@@ -107,7 +108,7 @@ void listener(void *parameter)
     } */
 
     // Example 2: ButtonPressType method.
-    ButtonPressType event = ctx->buttons->getPressType(ButtonIndex::TestButton);
+    ButtonPressType event = btnHandler->getPressType(ButtonIndex::TestButton);
     if (event == ButtonPressType::Short)
     {
       debugln("Short press detected!");

@@ -62,7 +62,7 @@ public:
     /**
      * @brief Scan and process button states (debounce and press timing).
      */
-    void update() override
+    void update() noexcept override
     {
         uint32_t now = millis();
 
@@ -106,7 +106,7 @@ public:
      * @param buttonId Index of button.
      * @return True if button is pressed.
      */
-    bool isPressed(uint8_t buttonId) override
+    bool isPressed(uint8_t buttonId) const noexcept override
     {
         if (buttonId >= N)
             return false;
@@ -118,7 +118,7 @@ public:
      * @param buttonId Index of button.
      * @return ButtonPressType Event type: Short, Long, or None.
      */
-    ButtonPressType getPressType(uint8_t buttonId) override
+    ButtonPressType getPressType(uint8_t buttonId) noexcept override
     {
         if (buttonId >= N)
             return ButtonPressType::None;
