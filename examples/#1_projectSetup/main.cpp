@@ -12,10 +12,11 @@
 #include <app_config.h>
 
 /**
- * @brief Constants and Type Definitions.
+ * @brief Constants and type definitions.
+ * @note On ESP32/FreeRTOS, stack size is in words (4 bytes each), not bytes.
  */
-constexpr int LISTENER_STACK = 2048; ///< Memory allocated to the listener stack (in bytes).
-constexpr int HANDLER_STACK = 4096;  ///< Memory allocated to the handler stack (in bytes).
+constexpr int LISTENER_STACK = 2048; ///< Memory allocated to the listener stack (~8 KB).
+constexpr int HANDLER_STACK = 4096;  ///< Memory allocated to the handler stack (~16 KB).
 
 constexpr UBaseType_t PRI_LISTENER = 1; ///< Task Priority 1.
 constexpr UBaseType_t PRI_HANDLER = 2;  ///< Task Priority 2.
