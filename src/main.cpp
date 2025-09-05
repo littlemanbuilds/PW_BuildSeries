@@ -10,6 +10,7 @@
  */
 
 #include <app_config.h>
+#include <Universal_Button.h>
 
 /**
  * @brief Constants and type definitions.
@@ -33,6 +34,19 @@ TaskHandle_t handler_t = nullptr;  ///< Handler logic task handle.
 void listener(void *parameter);
 void handler(void *parameter);
 
+/**
+ * @brief Task context passsed to the lisener RTOS task.
+ */
+struct ListenerContext
+{
+  Button *buttons{nullptr};
+};
+
+/**
+ * @brief Global instance used when creating the listener task.
+ */
+static ListenerContext listenerCtx{};
+
 void setup()
 {
   // Start serial debugging output.
@@ -40,11 +54,15 @@ void setup()
 
   debugln("===== Startup =====");
 
+  const ButtonTimingConfig kTiming{cfg::BTN_DEBOUNCE_MS, cfg::BTN_SHORT_MS, cfg::BTN_LONG_MS};
+  static Button buttons = makeButtons(kTiming);
+  listenerCtx.buttons = &buttons;
+
   // RTOS Task Creation.
   configASSERT(xTaskCreatePinnedToCore(listener,       ///< Task function (must be void listener(void *)).
                                        "listener",     ///< Task name (for debugging).
                                        LISTENER_STACK, ///< Stack size (in bytes).
-                                       0,              ///< Parameter passed to the task.
+                                       &listenerCtx,   ///< Parameter passed to the task.
                                        PRI_LISTENER,   ///< Task Priority.
                                        &listener_t,    ///< Pointer to the task handle.
                                        0) == pdPASS);  ///< Core to pin task to (core 0).
@@ -72,11 +90,24 @@ void loop()
  */
 void listener(void *parameter)
 {
+  auto *ctx = static_cast<ListenerContext *>(parameter);
+  Button &btns = *ctx->buttons;
+
   TickType_t lastWake = xTaskGetTickCount();
   for (;;)
   {
-    debugln("Hello Listener Task...");
-    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TESTING));
+    btns.update();
+
+    if (btns.isPressed(ButtonIndex::TestButton1))
+    {
+      debugln("TestButton1 is currently pressed...");
+    }
+    else
+    {
+      debugln("No input detected...");
+    }
+
+    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TEST_SHORT));
   }
 }
 
@@ -90,7 +121,7 @@ void handler(void *parameter)
   TickType_t lastWake = xTaskGetTickCount();
   for (;;)
   {
-    debugln("Hello Handler Task...");
-    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TESTING));
+    // debugln("Hello Handler Task...");
+    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TEST_LONG));
   }
 }

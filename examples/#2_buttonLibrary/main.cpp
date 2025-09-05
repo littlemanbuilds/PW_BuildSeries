@@ -10,7 +10,7 @@
  */
 
 #include <app_config.h>
-#include <ButtonHandler/ButtonHandler.h>
+#include <Universal_Button.h>
 
 /**
  * @brief Constants and type definitions.
@@ -21,14 +21,6 @@ constexpr int HANDLER_STACK = 4096;  ///< Memory allocated to the handler stack 
 
 constexpr UBaseType_t PRI_LISTENER = 1; ///< Task Priority 1.
 constexpr UBaseType_t PRI_HANDLER = 2;  ///< Task Priority 2.
-
-/**
- * @brief Task Context Structs (data passed to the RTOS tasks).
- */
-struct ListenerContext
-{
-  IButtonHandler *buttons; ///< Pointer to button handler interface for scanning inputs.
-};
 
 /**
  * @brief Global RTOS handles and queues.
@@ -42,6 +34,19 @@ TaskHandle_t handler_t = nullptr;  ///< Handler logic task handle.
 void listener(void *parameter);
 void handler(void *parameter);
 
+/**
+ * @brief Task context passsed to the lisener RTOS task.
+ */
+struct ListenerContext
+{
+  Button *buttons{nullptr};
+};
+
+/**
+ * @brief Global instance used when creating the listener task.
+ */
+static ListenerContext listenerCtx{};
+
 void setup()
 {
   // Start serial debugging output.
@@ -49,14 +54,9 @@ void setup()
 
   debugln("===== Startup =====");
 
-  // Hardware objects, initialized as statics for RTOS safety.
-  /* static ButtonHandler<NUM_BUTTONS> buttonHandler(BUTTON_PINS); */ // Example 1.
-  ButtonTimingConfig slowTiming{50, 300, 2000};
-  static ButtonHandler<NUM_BUTTONS> slowButtons(BUTTON_PINS, nullptr, slowTiming);
-
-  // RTOS Task Context Structs.
-  /* static ListenerContext listenerCtx{&buttonHandler}; */ // Example 1.
-  static ListenerContext listenerCtx{&slowButtons};
+  const ButtonTimingConfig kTiming{cfg::BTN_DEBOUNCE_MS, cfg::BTN_SHORT_MS, cfg::BTN_LONG_MS};
+  static Button buttons = makeButtons(kTiming);
+  listenerCtx.buttons = &buttons;
 
   // RTOS Task Creation.
   configASSERT(xTaskCreatePinnedToCore(listener,       ///< Task function (must be void listener(void *)).
@@ -91,36 +91,20 @@ void loop()
 void listener(void *parameter)
 {
   auto *ctx = static_cast<ListenerContext *>(parameter);
-  auto *btnHandler = ctx->buttons;
-  TickType_t lastWake = xTaskGetTickCount();
+  Button &btns = *ctx->buttons;
 
+  TickType_t lastWake = xTaskGetTickCount();
   for (;;)
   {
-    ctx->buttons->update(); // Scan all button states.
+    btns.update();
 
-    // Example 1: isPressed method.
-    /* if (btnHndler->isPressed(ButtonIndex::TestButton))
+    if (btns.isPressed(ButtonIndex::TestButton1))
     {
-      debugln("ButtonTest is pressed!");
+      debugln("TestButton1 is currently pressed...");
     }
     else
     {
-      debugln("No input detected.");
-    } */
-
-    // Example 2: ButtonPressType method.
-    ButtonPressType event = btnHandler->getPressType(ButtonIndex::TestButton);
-    if (event == ButtonPressType::Short)
-    {
-      debugln("Short press detected!");
-    }
-    else if (event == ButtonPressType::Long)
-    {
-      debugln("Long press detected!");
-    }
-    else
-    {
-      debugln("No input detected.");
+      debugln("No input detected...");
     }
 
     vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TEST_SHORT));

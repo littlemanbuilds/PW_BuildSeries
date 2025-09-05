@@ -12,6 +12,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <cstdint> // Provides fixed-width integer types
 
 /**
  * @brief Debugging macros.
@@ -32,35 +33,15 @@
 namespace cfg
 {
     constexpr int LOOP_INTERVAL_MS = 10;
-    constexpr int LOOP_INTERVAL_TEST_SHORT = 250;
+    constexpr int LOOP_INTERVAL_TEST_SHORT = 100;
     constexpr int LOOP_INTERVAL_TEST_LONG = 1000;
+    constexpr uint32_t BTN_DEBOUNCE_MS = 50;
+    constexpr uint32_t BTN_SHORT_MS = 200;
+    constexpr uint32_t BTN_LONG_MS = 1000;
 }
 
 /**
- * @brief Button pin assignments/index.
+ * @brief Application-defined button mapping.
  */
 #define BUTTON_LIST(X) \
-    X(TestButton, 7)
-
-struct ButtonsPins
-{
-#define X(name, pin) static constexpr uint8_t name = pin;
-    BUTTON_LIST(X)
-#undef X
-};
-
-constexpr uint8_t BUTTON_PINS[] = {
-#define X(name, pin) pin,
-    BUTTON_LIST(X)
-#undef X
-};
-
-constexpr size_t NUM_BUTTONS = sizeof(BUTTON_PINS) / sizeof(BUTTON_PINS[0]);
-
-enum ButtonIndex : uint8_t
-{
-#define X(name, pin) name,
-    BUTTON_LIST(X)
-#undef X
-        NUM_BUTTONS_ENUM
-};
+    X(TestButton1, 6)

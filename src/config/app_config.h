@@ -12,7 +12,11 @@
 #pragma once
 
 #include <Arduino.h>
+#include <cstdint> // Provides fixed-width integer types
 
+/**
+ * @brief Debugging macros.
+ */
 #define DEBUGGING true
 
 #if DEBUGGING == true
@@ -29,5 +33,15 @@
 namespace cfg
 {
     constexpr int LOOP_INTERVAL_MS = 10;
-    constexpr int LOOP_INTERVAL_TESTING = 1000;
+    constexpr int LOOP_INTERVAL_TEST_SHORT = 100;
+    constexpr int LOOP_INTERVAL_TEST_LONG = 1000;
+    constexpr uint32_t BTN_DEBOUNCE_MS = 50;
+    constexpr uint32_t BTN_SHORT_MS = 200;
+    constexpr uint32_t BTN_LONG_MS = 1000;
 }
+
+/**
+ * @brief Application-defined button mapping.
+ */
+#define BUTTON_LIST(X) \
+    X(TestButton1, 6)
