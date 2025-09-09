@@ -11,6 +11,7 @@
 
 #include <app_config.h>
 #include <Universal_Button.h>
+#include <ESP32_MCPWM.h>
 
 /**
  * @brief Constants and type definitions.
@@ -42,10 +43,16 @@ struct ListenerContext
   Button *buttons{nullptr};
 };
 
+struct HandlerContext
+{
+  Motor *motor{nullptr};
+};
+
 /**
  * @brief Global instance used when creating the listener task.
  */
 static ListenerContext listenerCtx{};
+static HandlerContext handlerCtx{};
 
 void setup()
 {
@@ -54,9 +61,21 @@ void setup()
 
   debugln("===== Startup =====");
 
+  // ---- Button Setup ----
   const ButtonTimingConfig kTiming{cfg::BTN_DEBOUNCE_MS, cfg::BTN_SHORT_MS, cfg::BTN_LONG_MS};
   static Button buttons = makeButtons(kTiming);
   listenerCtx.buttons = &buttons;
+
+  // ---- Motor Setup ----
+  static Motor driveMotor;
+
+  MotorMCPWMConfig hw{};
+  hw.rpwm_pin = cfg::motor::RPWM_PIN;
+  hw.lpwm_pin = cfg::motor::LPWM_PIN;
+  hw.en_pin = cfg::motor::EN_PIN;
+
+  driveMotor.setup(hw);
+  handlerCtx.motor = &driveMotor;
 
   // RTOS Task Creation.
   configASSERT(xTaskCreatePinnedToCore(listener,       ///< Task function (must be void listener(void *)).
@@ -67,7 +86,7 @@ void setup()
                                        &listener_t,    ///< Pointer to the task handle.
                                        0) == pdPASS);  ///< Core to pin task to (core 0).
   delay(50);
-  configASSERT(xTaskCreatePinnedToCore(handler, "handler", HANDLER_STACK, 0, PRI_HANDLER, &handler_t, 0) == pdPASS);
+  configASSERT(xTaskCreatePinnedToCore(handler, "handler", HANDLER_STACK, &handlerCtx, PRI_HANDLER, &handler_t, 0) == pdPASS);
   delay(50);
 
   debugln("All RTOS tasks started!");
@@ -98,14 +117,14 @@ void listener(void *parameter)
   {
     btns.update();
 
-    if (btns.isPressed(ButtonIndex::TestButton1))
+    /* if (btns.isPressed(ButtonIndex::TestButton1))
     {
       debugln("TestButton1 is currently pressed...");
     }
     else
     {
       debugln("No input detected...");
-    }
+    } */
 
     vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TEST_SHORT));
   }
@@ -118,10 +137,46 @@ void listener(void *parameter)
  */
 void handler(void *parameter)
 {
+  auto *ctx = static_cast<HandlerContext *>(parameter);
+  Motor &motor = *ctx->motor;
+
+  constexpr float STEP_PCT = 2.0f; ///< % per step.
+  constexpr int STEP_DELAY = 100;  ///< Time between steps (ms).
+  constexpr int END_HOLD = 1000;   ///< Pause between movements (ms).
+  Dir dir = Dir::CW;
+
   TickType_t lastWake = xTaskGetTickCount();
   for (;;)
   {
-    // debugln("Hello Handler Task...");
+    // ---- Ramp up: 0% -> 100% ----
+    for (float pct = 0.0f; pct <= 100.0f; pct += STEP_PCT)
+    {
+      motor.setSpeedPercent(pct, dir);
+      debug("Speed %: ");
+      debugln(pct, 1);
+      vTaskDelay(pdMS_TO_TICKS(STEP_DELAY));
+    }
+
+    // ---- Hold at max ----
+    debugln("Hold at max...");
+    vTaskDelay(pdMS_TO_TICKS(END_HOLD));
+
+    // ---- Ramp down: 100% -> 0% ----
+    for (float pct = 100.0f; pct >= 0.0f; pct -= STEP_PCT)
+    {
+      motor.setSpeedPercent(pct, dir);
+      debug("Speed %: ");
+      debugln(pct, 1);
+      vTaskDelay(pdMS_TO_TICKS(STEP_DELAY));
+    }
+
+    // ---- Pause at zero (neutral guard) ----
+    debugln("Hold at max...");
+    vTaskDelay(pdMS_TO_TICKS(END_HOLD));
+
+    // ---- Reverse direction ----
+    dir = (dir == Dir::CW) ? Dir::CCW : Dir::CW;
+
     vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TEST_LONG));
   }
 }

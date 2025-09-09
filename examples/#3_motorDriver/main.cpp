@@ -10,8 +10,8 @@
  */
 
 #include <app_config.h>
-#include <ButtonHandler/ButtonHandler.h>
-#include <HBridgeMotor/HBridgeMotor.h>
+#include <Universal_Button.h>
+#include <ESP32_MCPWM.h>
 
 /**
  * @brief Constants and type definitions.
@@ -22,19 +22,6 @@ constexpr int HANDLER_STACK = 4096;  ///< Memory allocated to the handler stack 
 
 constexpr UBaseType_t PRI_LISTENER = 1; ///< Task Priority 1.
 constexpr UBaseType_t PRI_HANDLER = 2;  ///< Task Priority 2.
-
-/**
- * @brief Task Context Structs (data passed to the RTOS tasks).
- */
-struct ListenerContext
-{
-  IButtonHandler *buttons; ///< Pointer to button handler interface for scanning inputs.
-};
-
-struct HandlerContext
-{
-  IMotorDriver *motor; ///< Pointer to motor driver interface implementation.
-};
 
 /**
  * @brief Global RTOS handles and queues.
@@ -48,6 +35,25 @@ TaskHandle_t handler_t = nullptr;  ///< Handler logic task handle.
 void listener(void *parameter);
 void handler(void *parameter);
 
+/**
+ * @brief Task context passsed to the lisener RTOS task.
+ */
+struct ListenerContext
+{
+  Button *buttons{nullptr};
+};
+
+struct HandlerContext
+{
+  Motor *motor{nullptr};
+};
+
+/**
+ * @brief Global instance used when creating the listener task.
+ */
+static ListenerContext listenerCtx{};
+static HandlerContext handlerCtx{};
+
 void setup()
 {
   // Start serial debugging output.
@@ -55,18 +61,21 @@ void setup()
 
   debugln("===== Startup =====");
 
-  // Hardware objects, initialized as statics for RTOS safety.
-  static ButtonHandler<NUM_BUTTONS> btnHandler(BUTTON_PINS, nullptr, ButtonTimingConfig{30, 200, 1000});
-  static HBridgeMotor driveMtr;
+  // ---- Button Setup ----
+  const ButtonTimingConfig kTiming{cfg::BTN_DEBOUNCE_MS, cfg::BTN_SHORT_MS, cfg::BTN_LONG_MS};
+  static Button buttons = makeButtons(kTiming);
+  listenerCtx.buttons = &buttons;
 
-  // Setup motor and behavior.
-  MotorBehaviorConfig mtrBeh(FreewheelMode::HiZ, 300, 30);
-  driveMtr.setup(DRIVE_MCPWM, mtrBeh);
-  // driveMtr.setup(DRIVE_MCPWM); ///< Default setup.
+  // ---- Motor Setup ----
+  static Motor driveMotor;
 
-  // RTOS Task Context Structs.
-  static ListenerContext listenerCtx{&btnHandler};
-  static HandlerContext handlerCtx{&driveMtr};
+  MotorMCPWMConfig hw{};
+  hw.rpwm_pin = cfg::motor::RPWM_PIN;
+  hw.lpwm_pin = cfg::motor::LPWM_PIN;
+  hw.en_pin = cfg::motor::EN_PIN;
+
+  driveMotor.setup(hw);
+  handlerCtx.motor = &driveMotor;
 
   // RTOS Task Creation.
   configASSERT(xTaskCreatePinnedToCore(listener,       ///< Task function (must be void listener(void *)).
@@ -100,21 +109,21 @@ void loop()
  */
 void listener(void *parameter)
 {
-  auto *ctx = static_cast<ListenerContext *>(parameter); ///< Recover typed task context from void* arg.
-  auto *btnHandler = ctx->buttons;                       ///< Local alias for button handler.
-  TickType_t lastWake = xTaskGetTickCount();
+  auto *ctx = static_cast<ListenerContext *>(parameter);
+  Button &btns = *ctx->buttons;
 
+  TickType_t lastWake = xTaskGetTickCount();
   for (;;)
   {
-    /* btnHandler->update(); // Scan all button states.
+    btns.update();
 
-    if (btnHandler->isPressed(ButtonIndex::TestButton))
+    /* if (btns.isPressed(ButtonIndex::TestButton1))
     {
-      debugln("ButtonTest is pressed!");
+      debugln("TestButton1 is currently pressed...");
     }
     else
     {
-      debugln("No input detected.");
+      debugln("No input detected...");
     } */
 
     vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TEST_SHORT));
@@ -128,42 +137,46 @@ void listener(void *parameter)
  */
 void handler(void *parameter)
 {
-  auto *ctx = static_cast<HandlerContext *>(parameter); ///< Recover typed task context from void* arg.
-  auto *mtrDriver = ctx->motor;                         ///< Local alias for motor driver.
+  auto *ctx = static_cast<HandlerContext *>(parameter);
+  Motor &motor = *ctx->motor;
+
+  constexpr float STEP_PCT = 2.0f; ///< % per step.
+  constexpr int STEP_DELAY = 100;  ///< Time between steps (ms).
+  constexpr int END_HOLD = 1000;   ///< Pause between movements (ms).
+  Dir dir = Dir::CW;
 
   TickType_t lastWake = xTaskGetTickCount();
-
-  // Determine the PWM range.
-  const uint16_t maxPWM = mtrDriver->getMaxPwmInput();
-  const uint16_t minPWM = 100; ///< Minimum effective PWM starting point.
-
   for (;;)
   {
-    debugln("Ramp up start...");
-    for (uint16_t pwm = minPWM; pwm <= maxPWM; pwm += 10)
+    // ---- Ramp up: 0% -> 100% ----
+    for (float pct = 0.0f; pct <= 100.0f; pct += STEP_PCT)
     {
-      mtrDriver->setSpeed(pwm, Dir::CW);
-      debug("Ramping up -> PWM: ");
-      debugln(pwm);
-      vTaskDelay(50 / portTICK_PERIOD_MS);
+      motor.setSpeedPercent(pct, dir);
+      debug("Speed %: ");
+      debugln(pct, 1);
+      vTaskDelay(pdMS_TO_TICKS(STEP_DELAY));
     }
 
-    debugln("Holding speed...");
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    // ---- Hold at max ----
+    debugln("Hold at max...");
+    vTaskDelay(pdMS_TO_TICKS(END_HOLD));
 
-    debugln("Ramp down start...");
-    for (int pwm = maxPWM; pwm >= minPWM; pwm -= 10)
+    // ---- Ramp down: 100% -> 0% ----
+    for (float pct = 100.0f; pct >= 0.0f; pct -= STEP_PCT)
     {
-      mtrDriver->setSpeed(pwm, Dir::CW);
-      debug("Ramping down -> PWM: ");
-      debugln(pwm);
-      vTaskDelay(50 / portTICK_PERIOD_MS);
+      motor.setSpeedPercent(pct, dir);
+      debug("Speed %: ");
+      debugln(pct, 1);
+      vTaskDelay(pdMS_TO_TICKS(STEP_DELAY));
     }
 
-    debugln("Coasting / Freewheel...");
-    mtrDriver->setFreewheel();
-    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    // ---- Pause at zero (neutral guard) ----
+    debugln("Hold at max...");
+    vTaskDelay(pdMS_TO_TICKS(END_HOLD));
 
-    // vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TEST_LONG));
+    // ---- Reverse direction ----
+    dir = (dir == Dir::CW) ? Dir::CCW : Dir::CW;
+
+    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(cfg::LOOP_INTERVAL_TEST_LONG));
   }
 }

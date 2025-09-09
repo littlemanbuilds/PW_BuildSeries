@@ -12,19 +12,30 @@
 #pragma once
 
 #include <Arduino.h>
-#include <cstdint> // Provides fixed-width integer types
+#include <cstdint>
 
 /**
- * @brief Debugging macros.
+ * @brief Debugging templates.
  */
 #define DEBUGGING true
 
-#if DEBUGGING == true
-#define debug(x) Serial.print(x)
-#define debugln(x) Serial.println(x)
+#if DEBUGGING
+template <typename T>
+inline void debug(const T &x) { Serial.print(x); }
+
+template <typename T>
+inline void debugln(const T &x) { Serial.println(x); }
+
+// Overloads for float with precision.
+inline void debug(float x, int digits) { Serial.print(x, digits); }
+inline void debugln(float x, int digits) { Serial.println(x, digits); }
 #else
-#define debug(x)
-#define debugln(x)
+template <typename T>
+inline void debug(const T &) {}
+template <typename T>
+inline void debugln(const T &) {}
+inline void debug(float, int) {}
+inline void debugln(float, int) {}
 #endif
 
 /**
@@ -38,7 +49,15 @@ namespace cfg
     constexpr uint32_t BTN_DEBOUNCE_MS = 50;
     constexpr uint32_t BTN_SHORT_MS = 200;
     constexpr uint32_t BTN_LONG_MS = 1000;
-}
+
+    // ---- Motor (MCPWM) ---- //
+    namespace motor
+    {
+        constexpr int RPWM_PIN = 37;
+        constexpr int LPWM_PIN = 38;
+        constexpr int EN_PIN = 39;
+    } ///< Namespace motor.
+} ///< Namespace cfg.
 
 /**
  * @brief Application-defined button mapping.
