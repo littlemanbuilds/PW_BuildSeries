@@ -14,30 +14,31 @@
 // Main run loop.
 void PowerDriveHandler::run() noexcept
 {
-    configASSERT(motor_ != nullptr && bus_ != nullptr); ///< Sanity check: motor and bus must be valid.
+    configASSERT(motor_ != nullptr && bus_ != nullptr); ///< Sanity check: motor_ and bus_ must be valid.
     configASSERT(loop_ticks_ > 0);                      ///< Timing must be configured.
 
     TickType_t last_wake = xTaskGetTickCount(); ///< Reference tick for periodic task scheduling.
 
     for (;;)
     {
-        const InputState cur = bus_->peek();
+        const ControlSnapshot cur = bus_->peek();
 
-        // ---- Simple acceleration/deceleration ----
-        const bool pressed = cur.buttons.test(btnAccel);
-        const float targetPct = pressed ? kMaxPct : kMinPct;
+        // Target selection.
+        const float targetPct = fminf(fmaxf(cur.throttle_cmd_pct, kMinPct), kMaxPct); ///< Clamp to avoid nonsense values.
+
+        // ---- Simple acceleration/deceleration (rate-based) ---- //
+        const float dt_sec =
+            (static_cast<float>(loop_ticks_) * static_cast<float>(portTICK_PERIOD_MS)) / 1000.0f;
+
+        const float ramp_step_pct = kRampRatePctPerSec * dt_sec;
 
         if (current_pct_ < targetPct)
         {
-            current_pct_ += kRampStepPct;
-            if (current_pct_ > kMaxPct)
-                current_pct_ = kMaxPct;
+            current_pct_ = fminf(current_pct_ + ramp_step_pct, targetPct);
         }
         else if (current_pct_ > targetPct)
         {
-            current_pct_ -= kRampStepPct;
-            if (current_pct_ < kMinPct)
-                current_pct_ = kMinPct;
+            current_pct_ = fmaxf(current_pct_ - ramp_step_pct, targetPct);
         }
 
         motor_->setSpeedPercent(current_pct_, kDir);

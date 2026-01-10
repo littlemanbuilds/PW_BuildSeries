@@ -18,11 +18,6 @@
 #include <SnapshotBus.h>
 
 /**
- * @brief Type alias for the snapshotbus that transports RC input frames.
- */
-using RcBus = snapshot::SnapshotBus<RcSnapshot>;
-
-/**
  * @brief Application-owned RC snapshot payload transported on SnapshotBus.
  */
 struct RcSnapshot
@@ -43,6 +38,11 @@ struct RcSnapshot
 {
     return f.out[static_cast<size_t>(role)];
 }
+
+/**
+ * @brief Type alias for the snapshotbus that transports RC input frames.
+ */
+using RcBus = snapshot::SnapshotBus<RcSnapshot>;
 
 /**
  * @brief Single, shared RcBus instance (created on first use).

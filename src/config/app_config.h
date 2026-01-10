@@ -117,8 +117,11 @@ namespace cfg
 } ///< Namespace cfg.
 
 // ---- Application button mapping ---- //
-#define BUTTON_LIST(X) \
-    X(Accelerator, 6)
+#define BUTTON_LIST(X)  \
+    X(Accelerator, 6)   \
+    X(Horn, 7)          \
+    X(IndicatorLeft, 8) \
+    X(IndicatorRight, 9)
 
 // ---- Remote control channel mapping ---- //
 #define RC_ROLES(X)             \

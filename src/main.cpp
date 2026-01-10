@@ -11,23 +11,27 @@
 
 #include <app_config.h>
 #include <StateManager/StateManager.h>
-#include <PowerDriveHandler/PowerDriveHandler.h>
 #include <RcPublisher/RcPublisher.h>
+#include <ControlCore/ControlCore.h>
+#include <PowerDriveHandler/PowerDriveHandler.h>
 
 /**
  * @brief Constants and type definitions.
  * @note On ESP32/FreeRTOS, stack size is in words (4 bytes each), not bytes.
  */
 constexpr int SM_STACK = 2048;  ///< Memory allocated to state manager (~8 KB).
+constexpr int CC_STACK = 4096;  ///< Memory allocated to control core (~16 KB).
 constexpr int PDH_STACK = 4096; ///< Memory allocated to power drive handler (~16 KB).
 
 constexpr UBaseType_t SM_PRI = 1;  ///< Task priority 1.
-constexpr UBaseType_t PDH_PRI = 2; ///< Task priority 2.
+constexpr UBaseType_t CC_PRI = 2;  ///< Task priority 2.
+constexpr UBaseType_t PDH_PRI = 3; ///< Task priority 3.
 
 /**
  * @brief Global RTOS handles and queues.
  */
 TaskHandle_t sm_t = nullptr;  ///< State manager logic task handle.
+TaskHandle_t cc_t = nullptr;  ///< Control core logic task handle.
 TaskHandle_t pdh_t = nullptr; ///< Power drive handler logic task handle.
 
 void setup()
@@ -40,6 +44,7 @@ void setup()
 
   // ---- Shared inputBus ---- //
   static InputBus inputBus{};
+  static ControlBus controlBus{};
 
   // ---- Button setup ---- //
   const ButtonTimingConfig kTiming{cfg::button::BTN_DEBOUNCE_MS, cfg::button::BTN_SHORT_MS,
@@ -57,18 +62,18 @@ void setup()
   driveMotor.setup(hw);
 
   // ---- Managers ---- //
-  static StateManager sm(btnHandler, inputBus);       ///< Defaults to cfg::tick::LOOP_MS.
-  static PowerDriveHandler pdh(driveMotor, inputBus); ///< Defaults to cfg::tick::LOOP_MS.
+  static StateManager sm(btnHandler, inputBus); ///< Defaults to cfg::tick::LOOP_MS.
   static RcPublisher rcp;
+  static ControlCore cc(inputBus, controlBus);
+  static PowerDriveHandler pdh(driveMotor, controlBus); ///< Defaults to cfg::tick::LOOP_MS.
 
   // ---- Start publishers ---- //
   rcp.begin();
 
-  // ---- Attach publishers to consumers ---- //
-  sm.attachRcBus(buses::rc());
-
   // ---- FreeRTOS tasks ----
   configASSERT(xTaskCreatePinnedToCore(StateManager::task, "StateManager", SM_STACK, &sm, SM_PRI, &sm_t, /*Core=*/0) == pdPASS);
+  delay(50);
+  configASSERT(xTaskCreatePinnedToCore(ControlCore::task, "ControlCore", CC_STACK, &cc, CC_PRI, &cc_t, /*Core=*/0) == pdPASS);
   delay(50);
   configASSERT(xTaskCreatePinnedToCore(PowerDriveHandler::task, "PDHandler", PDH_STACK, &pdh, PDH_PRI, &pdh_t, /*Core=*/1) == pdPASS);
   delay(50);

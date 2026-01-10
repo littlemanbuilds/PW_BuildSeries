@@ -1,9 +1,9 @@
 /**
  * MIT License
  *
- * @brief Button snapshot aliases and simple helpers.
+ * @brief Input snapshot payload and bus aliases (raw IO).
  *
- * @file InputTypes.h
+ * @file InputBus.h
  * @author Little Man Builds (Darren Osborne)
  * @date 2025-09-12
  * @copyright Copyright (c) 2025 Little Man Builds
@@ -12,19 +12,20 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <app_config.h>
 #include <Universal_Button.h>
 #include <ButtonHandler_Config.h>
 #include <SnapshotBus.h>
-#include <SnapshotModel.h>
+#include <InputModel.h>
 
 // ---- Aliases ---- //
 
 using Button = ButtonHandler<NUM_BUTTONS>;              ///< Concrete button handler bound to NUM_BUTTONS.
-using InputState = snapshot::model::State<NUM_BUTTONS>; ///< Snapshot payload: bitset of button states + timestamp.
+using InputState = snapshot::input::State<NUM_BUTTONS>; ///< Snapshot payload: bitset of button states + timestamp.
 using InputBus = snapshot::SnapshotBus<InputState>;     ///< Snapshot bus that transports InputState frames.
-using snapshot::model::for_each_edge;                   ///< Import edge-iteration helper for brevity.
-using snapshot::model::idx;                             ///< Import generic enum→index caster for brevity.
+using snapshot::input::for_each_edge;                   ///< Import edge-iteration helper for brevity.
+using snapshot::input::idx;                             ///< Import generic enum→index caster for brevity.
 
 // ---- Names table (generated from BUTTON_LIST) ---- //
 
@@ -68,4 +69,16 @@ inline void logButtonEvents(const InputState &prev, const InputState &cur) noexc
             debug(pressed ? " pressed @ " : " released @ "); ///< Edge type.
             debugln(t_ms);                                   ///< Timestamp (ms).
         });
+}
+
+/**
+ * @brief Single, shared InputBus instance
+ */
+namespace buses
+{
+    inline InputBus &input() noexcept ///< Return reference to the shared InputBus.
+    {
+        static InputBus bus{}; ///< One (only) InputBus instance.
+        return bus;            ///< Return reference to shared bus.
+    }
 }

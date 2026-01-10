@@ -13,7 +13,7 @@
 
 #include <app_config.h>
 #include <Universal_Button.h>
-#include <InputTypes.h>
+#include <InputBus.h>
 #include <RcBus.h>
 
 /**
@@ -39,9 +39,6 @@ public:
         static_cast<StateManager *>(self)->run();
     }
 
-    /// @brief Wire RC bus so StateManager can consume RcSnapshot frames (temporary).
-    inline void attachRcBus(RcBus &b) noexcept { rc_bus_ = &b; }
-
 private:
     /// @brief Main run loop.
     void run() noexcept;
@@ -51,10 +48,4 @@ private:
     IButtonHandler *buttons_{nullptr}; ///< Non-owning; provides update() and snapshot().
     InputBus *bus_{nullptr};           ///< Non-owning; receives published InputState frames.
     TickType_t loop_ticks_{0};         ///< Delay (in ticks) between loop iterations.
-
-    // ---- Demo read ---- //
-    RcBus *rc_bus_{nullptr};  ///< RC data.
-    float last_speed_{0.0f};  ///< Last seen speed.
-    bool last_fs_{false};     ///< Last seen failsafe state.
-    uint32_t rc_seen_seq_{0}; ///< Last seen RC bus sequence (change gating).
 };
